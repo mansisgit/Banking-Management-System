@@ -1,185 +1,101 @@
 package BankingManagementSystem;
-import java.math.BigDecimal;
+
 import java.sql.*;
 import java.util.Scanner;
 
-public class AccountManager {
+public class Accounts {
     private Connection connection;
     private Scanner scanner;
-    AccountManager(Connection connection, Scanner scanner){
+    public Accounts(Connection connection, Scanner scanner){
         this.connection = connection;
         this.scanner = scanner;
+
     }
 
 
-    public void credit_money(long account_number)throws SQLException {
-        scanner.nextLine();
-        System.out.print("Enter Amount: ");
-        double amount = scanner.nextDouble();
-        scanner.nextLine();
-        System.out.print("Enter Security Pin: ");
-        String security_pin = scanner.nextLine();
 
-        try {
-            connection.setAutoCommit(false);
-            if(account_number != 0) {
-                PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM Accounts WHERE account_number = ? and security_pin = ? ");
+
+    public long open_account(String email){
+        if(!account_exist(email)) {
+            String open_account_query = "INSERT INTO Accounts(account_number, full_name, email, balance, security_pin) VALUES(?, ?, ?, ?, ?)";
+            scanner.nextLine();
+            System.out.print("Enter Full Name: ");
+            String full_name = scanner.nextLine();
+            System.out.print("Enter Initial Amount: ");
+            double balance = scanner.nextDouble();
+            scanner.nextLine();
+            System.out.print("Enter Security Pin: ");
+            String security_pin = scanner.nextLine();
+            try {
+                long account_number = generateAccountNumber();
+                PreparedStatement preparedStatement = connection.prepareStatement(open_account_query);
                 preparedStatement.setLong(1, account_number);
-                preparedStatement.setString(2, security_pin);
-                ResultSet resultSet = preparedStatement.executeQuery();
-
-                if (resultSet.next()) {
-                    String credit_query = "UPDATE Accounts SET balance = balance + ? WHERE account_number = ?";
-                    PreparedStatement preparedStatement1 = connection.prepareStatement(credit_query);
-                    preparedStatement1.setDouble(1, amount);
-                    preparedStatement1.setLong(2, account_number);
-                    int rowsAffected = preparedStatement1.executeUpdate();
-                    if (rowsAffected > 0) {
-                        System.out.println("Rs."+amount+" credited Successfully");
-                        connection.commit();
-                        connection.setAutoCommit(true);
-                        return;
-                    } else {
-                        System.out.println("Transaction Failed!");
-                        connection.rollback();
-                        connection.setAutoCommit(true);
-                    }
-                }else{
-                    System.out.println("Invalid Security Pin!");
+                preparedStatement.setString(2, full_name);
+                preparedStatement.setString(3, email);
+                preparedStatement.setDouble(4, balance);
+                preparedStatement.setString(5, security_pin);
+                int rowsAffected = preparedStatement.executeUpdate();
+                if (rowsAffected > 0) {
+                    return account_number;
+                } else {
+                    throw new RuntimeException("Account Creation failed!!");
                 }
-            }
-        }catch (SQLException e){
-            e.printStackTrace();
-        }
-        connection.setAutoCommit(true);
-    }
-
-    public void debit_money(long account_number) throws SQLException {
-        scanner.nextLine();
-        System.out.print("Enter Amount: ");
-        double amount = scanner.nextDouble();
-        scanner.nextLine();
-        System.out.print("Enter Security Pin: ");
-        String security_pin = scanner.nextLine();
-        try {
-            connection.setAutoCommit(false);
-            if(account_number!=0) {
-                PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM Accounts WHERE account_number = ? and security_pin = ? ");
-                preparedStatement.setLong(1, account_number);
-                preparedStatement.setString(2, security_pin);
-                ResultSet resultSet = preparedStatement.executeQuery();
-
-                if (resultSet.next()) {
-                    double current_balance = resultSet.getDouble("balance");
-                    if (amount<=current_balance){
-                        String debit_query = "UPDATE Accounts SET balance = balance - ? WHERE account_number = ?";
-                        PreparedStatement preparedStatement1 = connection.prepareStatement(debit_query);
-                        preparedStatement1.setDouble(1, amount);
-                        preparedStatement1.setLong(2, account_number);
-                        int rowsAffected = preparedStatement1.executeUpdate();
-                        if (rowsAffected > 0) {
-                            System.out.println("Rs."+amount+" debited Successfully");
-                            connection.commit();
-                            connection.setAutoCommit(true);
-                            return;
-                        } else {
-                            System.out.println("Transaction Failed!");
-                            connection.rollback();
-                            connection.setAutoCommit(true);
-                        }
-                    }else{
-                        System.out.println("Insufficient Balance!");
-                    }
-                }else{
-                    System.out.println("Invalid Pin!");
-                }
-            }
-        }catch (SQLException e){
+            } catch (SQLException e) {
                 e.printStackTrace();
             }
-        connection.setAutoCommit(true);
-    }
-
-    public void transfer_money(long sender_account_number) throws SQLException {
-        scanner.nextLine();
-        System.out.print("Enter Receiver Account Number: ");
-        long receiver_account_number = scanner.nextLong();
-        System.out.print("Enter Amount: ");
-        double amount = scanner.nextDouble();
-        scanner.nextLine();
-        System.out.print("Enter Security Pin: ");
-        String security_pin = scanner.nextLine();
-        try{
-            connection.setAutoCommit(false);
-            if(sender_account_number!=0 && receiver_account_number!=0){
-                PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM Accounts WHERE account_number = ? AND security_pin = ? ");
-                preparedStatement.setLong(1, sender_account_number);
-                preparedStatement.setString(2, security_pin);
-                ResultSet resultSet = preparedStatement.executeQuery();
-
-                if (resultSet.next()) {
-                    double current_balance = resultSet.getDouble("balance");
-                    if (amount<=current_balance){
-
-                        // Write debit and credit queries
-                        String debit_query = "UPDATE Accounts SET balance = balance - ? WHERE account_number = ?";
-                        String credit_query = "UPDATE Accounts SET balance = balance + ? WHERE account_number = ?";
-
-                        // Debit and Credit prepared Statements
-                        PreparedStatement creditPreparedStatement = connection.prepareStatement(credit_query);
-                        PreparedStatement debitPreparedStatement = connection.prepareStatement(debit_query);
-
-                        // Set Values for debit and credit prepared statements
-                        creditPreparedStatement.setDouble(1, amount);
-                        creditPreparedStatement.setLong(2, receiver_account_number);
-                        debitPreparedStatement.setDouble(1, amount);
-                        debitPreparedStatement.setLong(2, sender_account_number);
-                        int rowsAffected1 = debitPreparedStatement.executeUpdate();
-                        int rowsAffected2 = creditPreparedStatement.executeUpdate();
-                        if (rowsAffected1 > 0 && rowsAffected2 > 0) {
-                            System.out.println("Transaction Successful!");
-                            System.out.println("Rs."+amount+" Transferred Successfully");
-                            connection.commit();
-                            connection.setAutoCommit(true);
-                            return;
-                        } else {
-                            System.out.println("Transaction Failed");
-                            connection.rollback();
-                            connection.setAutoCommit(true);
-                        }
-                    }else{
-                        System.out.println("Insufficient Balance!");
-                    }
-                }else{
-                    System.out.println("Invalid Security Pin!");
-                }
-            }else{
-                System.out.println("Invalid account number");
-            }
-        }catch (SQLException e){
-            e.printStackTrace();
         }
-        connection.setAutoCommit(true);
+        throw new RuntimeException("Account Already Exist");
+
     }
 
-    public void getBalance(long account_number){
-        scanner.nextLine();
-        System.out.print("Enter Security Pin: ");
-        String security_pin = scanner.nextLine();
+    public long getAccount_number(String email) {
+        String query = "SELECT account_number from Accounts WHERE email = ?";
         try{
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT balance FROM Accounts WHERE account_number = ? AND security_pin = ?");
-            preparedStatement.setLong(1, account_number);
-            preparedStatement.setString(2, security_pin);
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, email);
             ResultSet resultSet = preparedStatement.executeQuery();
             if(resultSet.next()){
-                double balance = resultSet.getDouble("balance");
-                System.out.println("Balance: "+balance);
-            }else{
-                System.out.println("Invalid Pin!");
+                return resultSet.getLong("account_number");
             }
         }catch (SQLException e){
             e.printStackTrace();
         }
+        throw new RuntimeException("Account Number Doesn't Exist!");
     }
 
+
+
+    private long generateAccountNumber() {
+        try {
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery("SELECT account_number from Accounts ORDER BY account_number DESC LIMIT 1");
+            if (resultSet.next()) {
+                long last_account_number = resultSet.getLong("account_number");
+                return last_account_number+1;
+            } else {
+                return 10000100;
+            }
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+        return 10000100;
+    }
+
+    public boolean account_exist(String email){
+        String query = "SELECT account_number from Accounts WHERE email = ?";
+        try{
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, email);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            if(resultSet.next()){
+                return true;
+            }else{
+                return false;
+            }
+        }catch (SQLException e){
+            e.printStackTrace();
+        }
+        return false;
+
+    }
 }
